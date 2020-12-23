@@ -1,5 +1,6 @@
-# java-sse-client
-Native Java 11 implementation of a HTTP event stream client to listen for Server-Sent Events (SSE)
+# Event Stream Client for Server-Sent Events
+Full implementation of a HTTP event stream client that listen for Server-Sent Events (SSE). 
+Requires Java 11 or higher, no other libraries are needed.
 
 ### How to use:
 ``` java
