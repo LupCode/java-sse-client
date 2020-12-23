@@ -6,18 +6,18 @@ Requires Java 11 or higher, no other libraries are needed.
 ``` java
 HttpEventStreamClient client = new HttpEventStreamClient("https://sse.example.com", new EventStreamAdapter() {
 			
-			@Override
-			public void onEvent(Event event) {
-				System.out.println("RECEIVED EVENT: "+event.toString());
-			}
-			
-			@Override
-			public void onClose() {
-				System.out.println("SSE Client closed");
-			}
-			
-		});
-		client.start().join();
+	@Override
+	public void onEvent(Event event) {
+		System.out.println("RECEIVED EVENT: "+event.toString());
+	}
+
+	@Override
+	public void onClose() {
+		System.out.println("SSE Client closed");
+	}
+
+});
+client.start().join();
 ```
 
 ### References:
