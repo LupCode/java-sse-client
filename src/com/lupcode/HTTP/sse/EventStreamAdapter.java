@@ -1,5 +1,7 @@
 package com.lupcode.HTTP.sse;
 
+import java.net.http.HttpResponse;
+
 import com.lupcode.HTTP.sse.HttpEventStreamClient.Event;
 
 /**
@@ -13,12 +15,13 @@ public abstract class EventStreamAdapter implements EventStreamListener {
 	public void onEvent(Event event) {}
 
 	@Override
-	public void onError(Throwable throwable) {}
+	public void onError(Throwable throwable) {
+		throwable.printStackTrace();
+	}
 	
 	@Override
-	public void onReconnect() {}
-	
-	@Override
-	public void onClose() {}
+	public void onReconnect(HttpResponse<Void> response) {}
 
+	@Override
+	public void onClose(HttpResponse<Void> response) {}
 }

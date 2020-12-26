@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -63,18 +64,26 @@ public class HttpEventStreamClient {
 					.append("; data=").append(data).append("}").toString();
 		}
 	}
-
-	private URI uri;
-	private HttpRequestMethod method = HttpRequestMethod.GET;
-	private BodyPublisher requestBody = null;
-	private HttpClient.Version version = null;
-	private TreeMap<String, String> headers = new TreeMap<>();
-	private long timeout, retryCooldown;
 	
-	private HttpClient client = null;
-	private long lastEventID = 1;
-	private HashSet<EventStreamListener> listeners = new HashSet<>();
-	private CompletableFuture<HttpResponse<Void>> running = null;
+	
+	protected abstract class InternalEventStreamAdapter extends EventStreamAdapter {
+		public void onStartFirst(HttpResponse<Void> lastResponse) {}
+		public void onStartLast(HttpResponse<Void> lastResponse, HttpRequest.Builder builder) {}
+	}
+	
+
+	protected URI uri;
+	protected HttpRequestMethod method = HttpRequestMethod.GET;
+	protected BodyPublisher requestBody = null;
+	protected HttpClient.Version version = null;
+	protected TreeMap<String, String> headers = new TreeMap<>();
+	protected long timeout, retryCooldown;
+	
+	protected HttpClient client = null;
+	protected long lastEventID = 1;
+	protected HashSet<EventStreamListener> listeners = new HashSet<>();
+	protected HashSet<InternalEventStreamAdapter> internalListeners = new HashSet<>();
+	protected CompletableFuture<HttpResponse<Void>> running = null;
 	
 	/**
 	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
@@ -419,6 +428,30 @@ public class HttpEventStreamClient {
 	 * @return This client instance
 	 */
 	public HttpEventStreamClient start() {
+		for(InternalEventStreamAdapter listener : internalListeners)
+			try {
+				listener.onStartFirst((running!=null && running.isDone()) ? running.get() : null);
+			} catch (InterruptedException | ExecutionException ex) {
+				for(InternalEventStreamAdapter l : internalListeners)
+					try { l.onError(ex); } catch (Exception ex1) {}
+			}
+		if(running!=null) {
+			for(InternalEventStreamAdapter listener : internalListeners)
+				try {
+					listener.onReconnect(running.isDone() ? running.get() : null);
+				} catch (Exception ex) {
+					for(EventStreamListener l : internalListeners)
+						try { l.onError(ex); } catch (Exception ex1) {}
+				}
+			for(EventStreamListener listener : listeners)
+				try {
+					listener.onReconnect(running.isDone() ? running.get() : null);
+				} catch (Exception ex) {
+					for(EventStreamListener l : listeners)
+						try { l.onError(ex); } catch (Exception ex1) {}
+				}
+		}
+		
 		if(client==null) client = HttpClient.newHttpClient();
 		final AtomicBoolean hasReceived = new AtomicBoolean(false);
 		HttpRequest.Builder request = HttpRequest.newBuilder(uri);
@@ -435,19 +468,16 @@ public class HttpEventStreamClient {
 		request.setHeader("Accept", "text/event-stream");
 		request.setHeader("Cache-Control", "no-cache");
 		request.setHeader("Last-Event-ID", lastEventID+"");
-		
 		if(timeout>=0) request.timeout(Duration.ofMillis(timeout));
-		if(running!=null)
-			for(EventStreamListener listener : listeners)
-				try {
-					listener.onReconnect();
-				} catch (Exception ex) {
-					for(EventStreamListener l : listeners)
-						try { l.onError(ex); } catch (Exception ex1) {}
-				}
+		
+		for(InternalEventStreamAdapter listener : internalListeners)
+			try {
+				listener.onStartLast((running!=null && running.isDone()) ? running.get() : null, request);
+			} catch (InterruptedException | ExecutionException e1) {}
+		
 		running = client.sendAsync(request.build(), BodyHandlers.ofByteArrayConsumer(new Consumer<Optional<byte[]>>() {
-			StringBuilder sb = new StringBuilder();
-			String event = null, data = null;
+			StringBuilder sb = new StringBuilder(), data = new StringBuilder();
+			String event = null;
 			@Override
 			public void accept(Optional<byte[]> t) {
 				if(t.isPresent()) {
@@ -467,27 +497,16 @@ public class HttpEventStreamClient {
 									break;
 									
 								case "data":
-									if(this.data == null) {
-										this.data = value;
-									} else {
-										Event event = new Event(this.event, value);
-										for(EventStreamListener listener : listeners)
-											try {
-												listener.onEvent(event);
-											} catch (Exception ex) {
-												for(EventStreamListener l : listeners)
-													try { l.onError(ex); } catch (Exception ex1) {}
-											}
-										this.event = null;
-										this.data = null;
-										lastEventID++;
-									}
+									if(data.length() > 0) data.append("\n");
+									data.append(value);
 									break;
 									
 								case "id":
 									try {
 										lastEventID = Long.parseLong(value);
 									} catch (Exception ex) {
+										for(InternalEventStreamAdapter l : internalListeners)
+											try { l.onError(ex); } catch (Exception ex1) {}
 										for(EventStreamListener l : listeners)
 											try { l.onError(ex); } catch (Exception ex1) {}
 									}
@@ -497,6 +516,8 @@ public class HttpEventStreamClient {
 									try {
 										retryCooldown = Long.parseLong(value);
 									} catch (Exception ex) {
+										for(InternalEventStreamAdapter l : internalListeners)
+											try { l.onError(ex); } catch (Exception ex1) {}
 										for(EventStreamListener l : listeners)
 											try { l.onError(ex); } catch (Exception ex1) {}
 									}
@@ -505,17 +526,23 @@ public class HttpEventStreamClient {
 								default: break;
 							}
 						}
-						if(this.data != null) {
-							Event event = new Event(this.event, this.data);
-							for(EventStreamListener listener : listeners)
-								try {
-									listener.onEvent(event);
-								} catch (Exception ex) {
-									for(EventStreamListener l : listeners)
-										try { l.onError(ex); } catch (Exception ex1) {}
-								}
-							lastEventID++;
-						}
+						Event event = new Event(this.event, this.data.toString());
+						for(InternalEventStreamAdapter listener : internalListeners)
+							try {
+								listener.onEvent(event);
+							} catch (Exception ex) {
+								for(InternalEventStreamAdapter l : internalListeners)
+									try { l.onError(ex); } catch (Exception ex1) {}
+							}
+						for(EventStreamListener listener : listeners)
+							try {
+								listener.onEvent(event);
+							} catch (Exception ex) {
+								for(EventStreamListener l : listeners)
+									try { l.onError(ex); } catch (Exception ex1) {}
+							}
+						this.data.setLength(0);
+						lastEventID++;
 					}
 				}
 			}
@@ -524,11 +551,14 @@ public class HttpEventStreamClient {
 
 			@Override
 			public Void apply(HttpResponse<Void> t, Throwable u) {
-				if(t != null)
-					System.out.println(t.headers().map());
-				if(u != null)
+				if(u != null) {
+					for(InternalEventStreamAdapter listener : internalListeners)
+						try { listener.onError(u); } catch (Exception e) {}
 					for(EventStreamListener listener : listeners)
 						try { listener.onError(u); } catch (Exception e) {}
+				}
+				
+				
 				if(hasReceived.get()) {
 					if(running != null) {
 						if(retryCooldown>0) try { Thread.sleep(retryCooldown); } catch (Exception e) {}
@@ -561,8 +591,10 @@ public class HttpEventStreamClient {
 		CompletableFuture<HttpResponse<Void>> run = running;
 		running = null;
 		if(run!=null) run.cancel(true);
+		for(InternalEventStreamAdapter listener : internalListeners)
+			try { listener.onClose(run.get()); } catch (Exception e) {}
 		for(EventStreamListener listener : listeners)
-			try { listener.onClose(); } catch (Exception e) {}
+			try { listener.onClose(run.get()); } catch (Exception e) {}
 		return this;
 	}
 }
