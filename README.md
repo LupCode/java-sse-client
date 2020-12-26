@@ -1,5 +1,5 @@
 # Event Stream Client for Server-Sent Events
-Full implementation of a HTTP event stream client that listen for Server-Sent Events (SSE). 
+Full implementation of a HTTP event stream client that listen for Server-Sent Events (SSE).  
 Requires Java 11 or higher, no other libraries are needed.
 
 ### How to use:
