@@ -14,6 +14,13 @@ import com.lupcode.HTTP.sse.EventStreamListener;
 import com.lupcode.HTTP.sse.HttpEventStreamClient;
 import com.lupcode.HTTP.sse.HttpRequestMethod;
 
+/**
+ * HTTP Client that can listen for Server-Sent Events (SSE). 
+ * In addition stores all received cookies and sends them in each request.
+ * Implements full protocol and supports automatic reconnect.
+ * @author LupCode.com (Luca Vogels)
+ * @since 2020-12-26
+ */
 public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 
 	protected HashMap<String, String> cookies = new HashMap<>();

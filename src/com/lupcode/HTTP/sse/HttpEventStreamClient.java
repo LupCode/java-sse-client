@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * HTTP Client that can listen for Server-Sent Events (SSE).
  * Implements full protocol and supports automatic reconnect.
  * @author LupCode.com (Luca Vogels)
- * @since 2020-12-22
+ * @since 2020-12-26
  */
 public class HttpEventStreamClient {
 	
