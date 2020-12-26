@@ -27,17 +27,19 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	protected HashMap<String, String> cookies2 = new HashMap<>();
 	
 	/**
-	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
+	 * Creates a HTTP client that listens for Server-Sent Events (SSE) 
+	 * and keeps track of all received cookies and sends them with each request.
 	 * Starts listening after calling {@link HttpEventStreamClient#start()}
 	 * @param url URL the client should listen at
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public CookieSessionHttpEventStreamClient(String url, EventStreamListener... listener) {
-		this(url, null, null, null, null, -1, -1, null, listener);
+		this(url, null, null, null, null, -1, -1, false, null, listener);
 	}
 	
 	/**
-	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
+	 * Creates a HTTP client that listens for Server-Sent Events (SSE) 
+	 * and keeps track of all received cookies and sends them with each request.
 	 * Starts listening after calling {@link HttpEventStreamClient#start()}
 	 * @param url URL the client should listen at
 	 * @param headers HTTP headers that should be set for the request. 
@@ -45,11 +47,12 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public CookieSessionHttpEventStreamClient(String url, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, null, null, null, headers, -1, -1, null, listener);
+		this(url, null, null, null, headers, -1, -1, false, null, listener);
 	}
 	
 	/**
-	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
+	 * Creates a HTTP client that listens for Server-Sent Events (SSE) 
+	 * and keeps track of all received cookies and sends them with each request.
 	 * Starts listening after calling {@link HttpEventStreamClient#start()}
 	 * @param url URL the client should listen at
 	 * @param method HTTP method that should be used to request the event stream (default GET)
@@ -59,11 +62,12 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public CookieSessionHttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, -1, -1, null, listener);
+		this(url, method, requestBody, null, headers, -1, -1, false, null, listener);
 	}
 	
 	/**
-	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
+	 * Creates a HTTP client that listens for Server-Sent Events (SSE) 
+	 * and keeps track of all received cookies and sends them with each request.
 	 * Starts listening after calling {@link HttpEventStreamClient#start()}
 	 * @param url URL the client should listen at
 	 * @param method HTTP method that should be used to request the event stream (default GET)
@@ -75,11 +79,12 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public CookieSessionHttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, long timeout, long retryCooldown, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, timeout, retryCooldown, null, listener);
+		this(url, method, requestBody, null, headers, timeout, retryCooldown, false, null, listener);
 	}
 	
 	/**
-	 * Creates a HTTP client that listens for Server-Sent Events (SSE).
+	 * Creates a HTTP client that listens for Server-Sent Events (SSE) 
+	 * and keeps track of all received cookies and sends them with each request.
 	 * Starts listening after calling {@link HttpEventStreamClient#start()}
 	 * @param url URL the client should listen at
 	 * @param method HTTP method that should be used to request the event stream (default GET)
@@ -89,11 +94,12 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	 * SSE specific headers will get overwritten [Accept, Cache-Control, Last-Event-ID] (optional)
 	 * @param timeout Timeout in milliseconds for the HTTP client before it reconnects (if negative then ignored)
 	 * @param retryCooldown Cooldown in milliseconds after connection loss before starting to reconnect (negative for no cooldown)
+	 * @param autoStopIfNoEvents If true then client automatically stops if connection closes and no events have been received since the last (re-)connect
 	 * @param client HTTP client that should be used (optional)
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
-	public CookieSessionHttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, HttpClient client, EventStreamListener... listener) {
-		super(url, method, requestBody, version, headers, timeout, retryCooldown, client, listener);
+	public CookieSessionHttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, boolean autoStopIfNoEvents, HttpClient client, EventStreamListener... listener) {
+		super(url, method, requestBody, version, headers, timeout, retryCooldown, autoStopIfNoEvents, client, listener);
 		internalListeners.add(new InternalEventStreamAdapter() {
 			
 			private void process(HttpResponse<Void> response) {
