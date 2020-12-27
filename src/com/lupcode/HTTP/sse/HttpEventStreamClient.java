@@ -17,6 +17,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
@@ -78,8 +79,9 @@ public class HttpEventStreamClient {
 	protected HttpClient.Version version = null;
 	protected TreeMap<String, String> headers = new TreeMap<>();
 	protected long timeout, retryCooldown;
-	protected boolean autoStopIfNoEvents;
+	protected int maxReconnectsWithoutEvents;
 	protected final AtomicBoolean hasReceivedEvents = new AtomicBoolean(false); // internal use
+	protected final AtomicInteger reconnectWithoutEvents = new AtomicInteger(0); // internal use
 	
 	protected HttpClient client = null;
 	protected long lastEventID = 1;
@@ -94,7 +96,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, EventStreamListener... listener) {
-		this(url, null, null, null, null, -1, -1, false, null, listener);
+		this(url, null, null, null, null, -1, -1, -1, null, listener);
 	}
 	
 	/**
@@ -106,7 +108,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, null, null, null, headers, -1, -1, false, null, listener);
+		this(url, null, null, null, headers, -1, -1, -1, null, listener);
 	}
 	
 	/**
@@ -120,7 +122,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, -1, -1, false, null, listener);
+		this(url, method, requestBody, null, headers, -1, -1, -1, null, listener);
 	}
 	
 	/**
@@ -136,7 +138,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, long timeout, long retryCooldown, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, timeout, retryCooldown, false, null, listener);
+		this(url, method, requestBody, null, headers, timeout, retryCooldown, -1, null, listener);
 	}
 	
 	/**
@@ -150,18 +152,19 @@ public class HttpEventStreamClient {
 	 * SSE specific headers will get overwritten [Accept, Cache-Control, Last-Event-ID] (optional)
 	 * @param timeout Timeout in milliseconds for the HTTP client before it reconnects (if negative then ignored)
 	 * @param retryCooldown Cooldown in milliseconds after connection loss before starting to reconnect (negative for no cooldown)
-	 * @param autoStopIfNoEvents If true then client automatically stops if connection closes and no events have been received since the last (re-)connect
+	 * @param maxReconnectsWithoutEvents How often client can reconnect 
+	 * without receiving events before it stops (zero for no reconnect, negative for infinitely)
 	 * @param client HTTP client that should be used (optional)
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
-	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, boolean autoStopIfNoEvents, HttpClient client, EventStreamListener... listener) {
+	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, int maxReconnectsWithoutEvents, HttpClient client, EventStreamListener... listener) {
 		this.uri = URI.create(url);
 		this.method = method!=null ? method : this.method;
 		this.requestBody = requestBody;
 		this.version = version;
 		this.timeout = timeout;
 		this.retryCooldown = retryCooldown;
-		this.autoStopIfNoEvents = autoStopIfNoEvents;
+		this.maxReconnectsWithoutEvents = maxReconnectsWithoutEvents;
 		this.client = client;
 		setHeaders(headers);
 		addListener(listener);
@@ -347,21 +350,52 @@ public class HttpEventStreamClient {
 	}
 	
 	/**
-	 * Returns if the client automatically stops if connection 
-	 * closes and no events have been received since the last (re-)connect
+	 * Returns true if client automatically stops after a certain amount 
+	 * of reconnects without receiving events in between
 	 * @return True if auto stop enabled
 	 */
-	public boolean isAutoStopIfNoEvents() {
-		return autoStopIfNoEvents;
+	public boolean isAutoStopIfNoEventsEnabled() {
+		return maxReconnectsWithoutEvents > 0;
 	}
 	
 	/**
-	 * Sets if the client should automatically stop if connection 
-	 * closes and no events have been received since the last (re-)connect
-	 * @param autoStopIfNoEvents If true client automatically stops
+	 * Returns true if client automatically reconnects if connection is lost
+	 * @return True if reconnect on connection loss
 	 */
-	public void setAutoStopIfNoEvents(boolean autoStopIfNoEvents) {
-		this.autoStopIfNoEvents = autoStopIfNoEvents;
+	public boolean isReconnectEnabled() {
+		return maxReconnectsWithoutEvents != 0;
+	}
+	
+	/**
+	 * Returns how often client can reconnect without receiving events in between 
+	 * before it automatically stops. 
+	 * If zero then client will not reconnect after a connection loss. 
+	 * If negative then auto stop is disabled and client keeps reconnecting for ever
+	 * @return Max reconnects without events before stopping
+	 */
+	public int getAutoStopThreshold() {
+		return maxReconnectsWithoutEvents;
+	}
+	
+	/**
+	 * Sets how often the client can reconnect without receiving events in between 
+	 * before it automatically stops. 
+	 * If zero then client will not reconnect after a connection loss. 
+	 * If negative then client will keep reconnecting for ever
+	 * @param maxReconnectsWithoutEvents How often client can reconnect 
+	 * without receiving events before it stops (zero for no reconnect, negative for infinitely)
+	 */
+	public void setAutoStopThreshold(int maxReconnectsWithoutEvents) {
+		this.maxReconnectsWithoutEvents = maxReconnectsWithoutEvents;
+	}
+	
+	/**
+	 * Returns how often client reconnected so far without receiving any events in between. 
+	 * Gets reset to zero if client receives an event
+	 * @return Reconnection count without events
+	 */
+	public int getReconnectsWithoutEvents() {
+		return reconnectWithoutEvents.get();
 	}
 	
 	/**
@@ -504,6 +538,8 @@ public class HttpEventStreamClient {
 			public void accept(Optional<byte[]> t) {
 				if(t.isPresent()) {
 					hasReceivedEvents.set(true);
+					reconnectWithoutEvents.set(0);
+					
 					sb.append(new String(t.get(), StandardCharsets.UTF_8));
 					int index;
 					while((index = sb.indexOf("\n\n")) >= 0) {
@@ -580,8 +616,10 @@ public class HttpEventStreamClient {
 						try { listener.onError(HttpEventStreamClient.this, u); } catch (Exception e) {}
 				}
 				
+				if(!hasReceivedEvents.get())
+					reconnectWithoutEvents.incrementAndGet();
 				
-				if(!autoStopIfNoEvents || hasReceivedEvents.get()) {
+				if(maxReconnectsWithoutEvents < 0 || reconnectWithoutEvents.get() < maxReconnectsWithoutEvents) {
 					if(running != null) {
 						if(retryCooldown>0) try { Thread.sleep(retryCooldown); } catch (Exception e) {}
 						start();
