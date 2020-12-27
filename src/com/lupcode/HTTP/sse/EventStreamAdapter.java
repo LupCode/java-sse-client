@@ -12,16 +12,16 @@ import com.lupcode.HTTP.sse.HttpEventStreamClient.Event;
 public abstract class EventStreamAdapter implements EventStreamListener {
 
 	@Override
-	public void onEvent(Event event) {}
+	public void onEvent(HttpEventStreamClient client, Event event) {}
 
 	@Override
-	public void onError(Throwable throwable) {
+	public void onError(HttpEventStreamClient client, Throwable throwable) {
 		throwable.printStackTrace();
 	}
 	
 	@Override
-	public void onReconnect(HttpResponse<Void> response, boolean hasReceivedEvents) {}
+	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents) {}
 
 	@Override
-	public void onClose(HttpResponse<Void> response) {}
+	public void onClose(HttpEventStreamClient client, HttpResponse<Void> response) {}
 }

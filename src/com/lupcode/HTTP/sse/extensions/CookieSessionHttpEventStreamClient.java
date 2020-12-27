@@ -145,7 +145,7 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 			}
 			
 			@Override
-			public void onClose(HttpResponse<Void> response) {
+			public void onClose(HttpEventStreamClient client, HttpResponse<Void> response) {
 				process(response);
 			}
 			

@@ -11,26 +11,30 @@ public interface EventStreamListener {
 	
 	/**
 	 * Gets called if a new event has been received
+	 * @param client Event stream client that received the event
 	 * @param event Event that has been received
 	 */
-	public void onEvent(HttpEventStreamClient.Event event);
+	public void onEvent(HttpEventStreamClient client, HttpEventStreamClient.Event event);
 	
 	/**
 	 * Gets called if an error has occurred
+	 * @param client Event stream client that caused the error
 	 * @param throwable Error that occurred
 	 */
-	public void onError(Throwable throwable);
+	public void onError(HttpEventStreamClient client, Throwable throwable);
 	
 	/**
 	 * Gets called if {@link HttpEventStreamClient} lost connection and will reconnect
+	 * @param client Event stream client that reconnects
 	 * @param response Last response received from server (may be null)
 	 * @param hasReceivedEvents True if at least one event has been received since the last (re-)connect
 	 */
-	public void onReconnect(HttpResponse<Void> response, boolean hasReceivedEvents);
+	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents);
 	
 	/**
 	 * Gets called if client has been closed
+	 * @param client Event stream client that has closed
 	 * @param response Last response received from server
 	 */
-	public void onClose(HttpResponse<Void> response);
+	public void onClose(HttpEventStreamClient client, HttpResponse<Void> response);
 }
