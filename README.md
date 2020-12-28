@@ -2,7 +2,7 @@
 Full implementation of a HTTP event stream client that listen for Server-Sent Events (SSE).  
 Requires Java 11 or higher, no other libraries are needed.
 
-### How to use:
+## How to use:
 ``` java
 HttpEventStreamClient client = new HttpEventStreamClient("https://sse.example.com", new EventStreamAdapter() {
 			
@@ -20,6 +20,6 @@ HttpEventStreamClient client = new HttpEventStreamClient("https://sse.example.co
 client.start().join();
 ```
 
-### References:
+## References:
  - [LupCode.com](https://lupcode.com)
  - [Lup.services](https://lup.services)
