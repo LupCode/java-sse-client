@@ -101,18 +101,7 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 			
 			private void process(HttpResponse<Void> response) {
 				if(response==null) return;
-
-				List<String> cookieList = response.headers().allValues("set-cookie");
-				if(cookieList != null && !cookieList.isEmpty())
-					for(String c : cookieList) {
-						parseSetCookie(c);
-					}
-				
-				List<String> cookieList2 = response.headers().allValues("set-cookie2");
-				if(cookieList2 != null && !cookieList2.isEmpty())
-					for(String c : cookieList2) {
-						parseSetCookie2(c);
-					}
+				parseCookiesFromHeaders(response.headers().map());
 			}
 			
 			@Override
@@ -226,6 +215,42 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 		if(indexSign <= 0) throw new IllegalArgumentException("Set-Cookie invalid format");
 		int indexEnd = raw.indexOf(";", indexSign+1);
 		cookies.put(raw.substring(0, indexSign), raw.substring(indexSign+1, indexEnd>0 ? indexEnd : raw.length()));
+		return this;
+	}
+	
+	
+	/**
+	 * Parses all cookie information from the given HTTP headers
+	 * @param headers Headers that should be parsed
+	 * @return This instance
+	 * @throws NullPointerException if headers is null
+	 */
+	public CookieSessionHttpEventStreamClient parseCookiesFromHeaders(Map<String, List<String>> headers) throws NullPointerException {
+		if(headers==null) throw new NullPointerException("Headers cannot be null");
+		List<String> list = headers.get("cookie");
+		if(list != null && !list.isEmpty())
+			for(String c : list) {
+				parseCookie(c);
+			}
+		
+		list = headers.get("set-cookie");
+		if(list != null && !list.isEmpty())
+			for(String c : list) {
+				parseSetCookie(c);
+			}
+		
+		list = headers.get("cookie2");
+		if(list != null && !list.isEmpty())
+			for(String c : list) {
+				parseCookie2(c);
+			}
+		
+		list = headers.get("set-cookie2");
+		if(list != null && !list.isEmpty())
+			for(String c : list) {
+				parseSetCookie2(c);
+			}
+		
 		return this;
 	}
 	
