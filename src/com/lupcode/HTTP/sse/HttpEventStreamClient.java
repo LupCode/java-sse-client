@@ -639,6 +639,7 @@ public class HttpEventStreamClient {
 	public HttpEventStreamClient join() {
 		while(running != null)
 			try { running.join(); } catch (Exception e) {}
+		lastEventID = 1;
 		return this;
 	}
 	
