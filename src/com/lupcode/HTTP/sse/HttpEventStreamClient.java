@@ -85,6 +85,7 @@ public class HttpEventStreamClient {
 	
 	protected HttpClient client = null;
 	protected long lastEventID = 0;
+	protected boolean resetEventIDonReconnect;
 	protected HashSet<EventStreamListener> listeners = new HashSet<>();
 	protected HashSet<InternalEventStreamAdapter> internalListeners = new HashSet<>();
 	protected CompletableFuture<HttpResponse<Void>> running = null;
@@ -96,7 +97,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, EventStreamListener... listener) {
-		this(url, null, null, null, null, -1, -1, -1, null, listener);
+		this(url, null, null, null, null, -1, -1, -1, false, null, listener);
 	}
 	
 	/**
@@ -108,7 +109,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, null, null, null, headers, -1, -1, -1, null, listener);
+		this(url, null, null, null, headers, -1, -1, -1, false, null, listener);
 	}
 	
 	/**
@@ -122,7 +123,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, -1, -1, -1, null, listener);
+		this(url, method, requestBody, null, headers, -1, -1, -1, false, null, listener);
 	}
 	
 	/**
@@ -138,7 +139,7 @@ public class HttpEventStreamClient {
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
 	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, Map<String, String> headers, long timeout, long retryCooldown, EventStreamListener... listener) {
-		this(url, method, requestBody, null, headers, timeout, retryCooldown, -1, null, listener);
+		this(url, method, requestBody, null, headers, timeout, retryCooldown, -1, false, null, listener);
 	}
 	
 	/**
@@ -154,10 +155,11 @@ public class HttpEventStreamClient {
 	 * @param retryCooldown Cooldown in milliseconds after connection loss before starting to reconnect (negative for no cooldown)
 	 * @param maxReconnectsWithoutEvents How often client can reconnect 
 	 * without receiving events before it stops (zero for no reconnect, negative for infinitely)
+	 * @param resetEventIDonReconnect If true then event id will be set back to zero on reconnect
 	 * @param client HTTP client that should be used (optional)
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
-	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, int maxReconnectsWithoutEvents, HttpClient client, EventStreamListener... listener) {
+	public HttpEventStreamClient(String url, HttpRequestMethod method, BodyPublisher requestBody, HttpClient.Version version, Map<String, String> headers, long timeout, long retryCooldown, int maxReconnectsWithoutEvents, boolean resetEventIDonReconnect, HttpClient client, EventStreamListener... listener) {
 		this.uri = URI.create(url);
 		this.method = method!=null ? method : this.method;
 		this.requestBody = requestBody;
@@ -165,6 +167,7 @@ public class HttpEventStreamClient {
 		this.timeout = timeout;
 		this.retryCooldown = retryCooldown;
 		this.maxReconnectsWithoutEvents = maxReconnectsWithoutEvents;
+		this.resetEventIDonReconnect = resetEventIDonReconnect;
 		this.client = client;
 		setHeaders(headers);
 		addListener(listener);
@@ -435,6 +438,22 @@ public class HttpEventStreamClient {
 	}
 	
 	/**
+	 * Returns if last event id gets reset to zero on reconnect
+	 * @return True if set to zero on reconnect
+	 */
+	public boolean isResetLastEventIDonReconnect() {
+		return resetEventIDonReconnect;
+	}
+	
+	/**
+	 * Sets if the last event it should be set to zero on a reconnect
+	 * @param reset If true then last event it will be reset on reconnect
+	 */
+	public void setResetLastEventIDonReconnect(boolean reset) {
+		this.resetEventIDonReconnect = reset;
+	}
+	
+	/**
 	 * Returns a set containing all added listeners
 	 * @return Set of all added listeners
 	 */
@@ -492,16 +511,18 @@ public class HttpEventStreamClient {
 					try { l.onError(this, ex); } catch (Exception ex1) {}
 			}
 		if(running!=null) {
+			final long leid = lastEventID;
+			if(resetEventIDonReconnect) lastEventID = 0;
 			for(InternalEventStreamAdapter listener : internalListeners)
 				try {
-					listener.onReconnect(this, running.isDone() ? running.get() : null, hasReceivedEvents.get());
+					listener.onReconnect(this, running.isDone() ? running.get() : null, hasReceivedEvents.get(), leid);
 				} catch (Exception ex) {
 					for(EventStreamListener l : internalListeners)
 						try { l.onError(this, ex); } catch (Exception ex1) {}
 				}
 			for(EventStreamListener listener : listeners)
 				try {
-					listener.onReconnect(this, running.isDone() ? running.get() : null, hasReceivedEvents.get());
+					listener.onReconnect(this, running.isDone() ? running.get() : null, hasReceivedEvents.get(), leid);
 				} catch (Exception ex) {
 					for(EventStreamListener l : listeners)
 						try { l.onError(this, ex); } catch (Exception ex1) {}

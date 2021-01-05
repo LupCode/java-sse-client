@@ -28,8 +28,9 @@ public interface EventStreamListener {
 	 * @param client Event stream client that reconnects
 	 * @param response Last response received from server (may be null)
 	 * @param hasReceivedEvents True if at least one event has been received since the last (re-)connect
+	 * @param lastEventID ID of last event that was received
 	 */
-	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents);
+	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents, long lastEventID);
 	
 	/**
 	 * Gets called if client has been closed

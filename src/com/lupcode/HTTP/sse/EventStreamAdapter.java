@@ -20,8 +20,8 @@ public abstract class EventStreamAdapter implements EventStreamListener {
 	}
 	
 	@Override
-	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents) {}
-
+	public void onReconnect(HttpEventStreamClient client, HttpResponse<Void> response, boolean hasReceivedEvents, long lastEventID) {}
+	
 	@Override
 	public void onClose(HttpEventStreamClient client, HttpResponse<Void> response) {}
 }
