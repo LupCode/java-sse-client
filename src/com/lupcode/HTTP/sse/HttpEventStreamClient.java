@@ -84,7 +84,7 @@ public class HttpEventStreamClient {
 	protected final AtomicInteger reconnectWithoutEvents = new AtomicInteger(0); // internal use
 	
 	protected HttpClient client = null;
-	protected long lastEventID = 0;
+	protected long lastEventID = 1;
 	protected boolean resetEventIDonReconnect;
 	protected HashSet<EventStreamListener> listeners = new HashSet<>();
 	protected HashSet<InternalEventStreamAdapter> internalListeners = new HashSet<>();
@@ -155,7 +155,7 @@ public class HttpEventStreamClient {
 	 * @param retryCooldown Cooldown in milliseconds after connection loss before starting to reconnect (negative for no cooldown)
 	 * @param maxReconnectsWithoutEvents How often client can reconnect 
 	 * without receiving events before it stops (zero for no reconnect, negative for infinitely)
-	 * @param resetEventIDonReconnect If true then event id will be set back to zero on reconnect
+	 * @param resetEventIDonReconnect If true then event id will be set back to zero on a reconnect (default false)
 	 * @param client HTTP client that should be used (optional)
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */
@@ -439,7 +439,7 @@ public class HttpEventStreamClient {
 	
 	/**
 	 * Returns if last event id gets reset to zero on reconnect
-	 * @return True if set to zero on reconnect
+	 * @return True if set to zero on a reconnect
 	 */
 	public boolean isResetLastEventIDonReconnect() {
 		return resetEventIDonReconnect;
@@ -447,7 +447,7 @@ public class HttpEventStreamClient {
 	
 	/**
 	 * Sets if the last event it should be set to zero on a reconnect
-	 * @param reset If true then last event it will be reset on reconnect
+	 * @param reset If true then last event it will be reset on a reconnect
 	 */
 	public void setResetLastEventIDonReconnect(boolean reset) {
 		this.resetEventIDonReconnect = reset;
@@ -544,7 +544,7 @@ public class HttpEventStreamClient {
 			request.setHeader(entry.getKey(), entry.getValue());
 		request.setHeader("Accept", "text/event-stream");
 		request.setHeader("Cache-Control", "no-cache");
-		request.setHeader("Last-Event-ID", lastEventID+"");
+		if(lastEventID > 0) request.setHeader("Last-Event-ID", lastEventID+"");
 		if(timeout>=0) request.timeout(Duration.ofMillis(timeout));
 		
 		for(InternalEventStreamAdapter listener : internalListeners)
@@ -606,22 +606,22 @@ public class HttpEventStreamClient {
 							}
 						}
 						Event event = new Event(this.event, this.data.toString());
+						lastEventID++;
 						for(InternalEventStreamAdapter listener : internalListeners)
 							try {
-								listener.onEvent(HttpEventStreamClient.this, event);
+								listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
 							} catch (Exception ex) {
 								for(InternalEventStreamAdapter l : internalListeners)
 									try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
 							}
 						for(EventStreamListener listener : listeners)
 							try {
-								listener.onEvent(HttpEventStreamClient.this, event);
+								listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
 							} catch (Exception ex) {
 								for(EventStreamListener l : listeners)
 									try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
 							}
 						this.data.setLength(0);
-						lastEventID++;
 					}
 				}
 			}

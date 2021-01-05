@@ -91,7 +91,7 @@ public class CookieSessionHttpEventStreamClient extends HttpEventStreamClient {
 	 * @param retryCooldown Cooldown in milliseconds after connection loss before starting to reconnect (negative for no cooldown)
 	 * @param maxReconnectsWithoutEvents How often client can reconnect 
 	 * without receiving events before it stops (zero for no reconnect, negative for infinitely)
-	 * @param resetEventIDonReconnect If true then event id will be set back to zero on reconnect
+	 * @param resetEventIDonReconnect If true then event id will be set back to zero on a reconnect (default false)
 	 * @param client HTTP client that should be used (optional)
 	 * @param listener Event stream listeners that listen for arriving events (optional)
 	 */

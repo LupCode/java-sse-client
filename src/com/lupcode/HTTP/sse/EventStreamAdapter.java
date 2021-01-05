@@ -12,7 +12,7 @@ import com.lupcode.HTTP.sse.HttpEventStreamClient.Event;
 public abstract class EventStreamAdapter implements EventStreamListener {
 
 	@Override
-	public void onEvent(HttpEventStreamClient client, Event event) {}
+	public void onEvent(HttpEventStreamClient client, long eventID, Event event) {}
 
 	@Override
 	public void onError(HttpEventStreamClient client, Throwable throwable) {
