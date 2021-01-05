@@ -84,7 +84,7 @@ public class HttpEventStreamClient {
 	protected final AtomicInteger reconnectWithoutEvents = new AtomicInteger(0); // internal use
 	
 	protected HttpClient client = null;
-	protected long lastEventID = 1;
+	protected long lastEventID = 0;
 	protected HashSet<EventStreamListener> listeners = new HashSet<>();
 	protected HashSet<InternalEventStreamAdapter> internalListeners = new HashSet<>();
 	protected CompletableFuture<HttpResponse<Void>> running = null;
