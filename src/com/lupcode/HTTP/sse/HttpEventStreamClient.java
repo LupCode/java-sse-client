@@ -566,7 +566,7 @@ public class HttpEventStreamClient {
 					while((index = sb.indexOf("\n\n")) >= 0) {
 						String[] lines = sb.substring(0, index).split("\n");
 						sb.delete(0, index+2); // delete first block including "\n\n"
-						boolean hasDataOrEvent = false;
+						boolean hasDataOrEvent = false, updatedEventID = false;
 						for(String line : lines) {
 							int idx = line.indexOf(':');
 							if(idx<=0) continue; // ignore invalids or comments
@@ -586,6 +586,7 @@ public class HttpEventStreamClient {
 								case "id":
 									try {
 										lastEventID = Long.parseLong(value);
+										updatedEventID = true;
 									} catch (Exception ex) {
 										for(InternalEventStreamAdapter l : internalListeners)
 											try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
@@ -611,7 +612,7 @@ public class HttpEventStreamClient {
 						
 						if(hasDataOrEvent) {
 							Event event = new Event(this.event, this.data.toString());
-							lastEventID++;
+							if(!updatedEventID) lastEventID++;
 							for(InternalEventStreamAdapter listener : internalListeners)
 								try {
 									listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
