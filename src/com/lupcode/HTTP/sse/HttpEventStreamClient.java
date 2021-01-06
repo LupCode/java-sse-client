@@ -84,7 +84,7 @@ public class HttpEventStreamClient {
 	protected final AtomicInteger reconnectWithoutEvents = new AtomicInteger(0); // internal use
 	
 	protected HttpClient client = null;
-	protected long lastEventID = 1;
+	protected long lastEventID = 0;
 	protected boolean resetEventIDonReconnect;
 	protected HashSet<EventStreamListener> listeners = new HashSet<>();
 	protected HashSet<InternalEventStreamAdapter> internalListeners = new HashSet<>();
@@ -565,7 +565,8 @@ public class HttpEventStreamClient {
 					int index;
 					while((index = sb.indexOf("\n\n")) >= 0) {
 						String[] lines = sb.substring(0, index).split("\n");
-						sb.delete(0, index+2);
+						sb.delete(0, index+2); // delete first block including "\n\n"
+						boolean hasDataOrEvent = false;
 						for(String line : lines) {
 							int idx = line.indexOf(':');
 							if(idx<=0) continue; // ignore invalids or comments
@@ -573,11 +574,13 @@ public class HttpEventStreamClient {
 							switch(key.trim().toLowerCase()) {
 								case "event":
 									this.event = value;
+									hasDataOrEvent = true;
 									break;
 									
 								case "data":
 									if(data.length() > 0) data.append("\n");
 									data.append(value);
+									hasDataOrEvent = true;
 									break;
 									
 								case "id":
@@ -605,23 +608,26 @@ public class HttpEventStreamClient {
 								default: break;
 							}
 						}
-						Event event = new Event(this.event, this.data.toString());
-						lastEventID++;
-						for(InternalEventStreamAdapter listener : internalListeners)
-							try {
-								listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
-							} catch (Exception ex) {
-								for(InternalEventStreamAdapter l : internalListeners)
-									try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
-							}
-						for(EventStreamListener listener : listeners)
-							try {
-								listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
-							} catch (Exception ex) {
-								for(EventStreamListener l : listeners)
-									try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
-							}
-						this.data.setLength(0);
+						
+						if(hasDataOrEvent) {
+							Event event = new Event(this.event, this.data.toString());
+							lastEventID++;
+							for(InternalEventStreamAdapter listener : internalListeners)
+								try {
+									listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
+								} catch (Exception ex) {
+									for(InternalEventStreamAdapter l : internalListeners)
+										try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
+								}
+							for(EventStreamListener listener : listeners)
+								try {
+									listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
+								} catch (Exception ex) {
+									for(EventStreamListener l : listeners)
+										try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
+								}
+							this.data.setLength(0);
+						}
 					}
 				}
 			}
