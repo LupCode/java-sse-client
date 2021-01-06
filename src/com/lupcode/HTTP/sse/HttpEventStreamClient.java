@@ -72,8 +72,9 @@ public class HttpEventStreamClient {
 		
 		@Override
 		public String toString() {
-			return new StringBuilder(getClass().getSimpleName()).append("{event=").append(event)
-					.append("; data=").append(data).append("}").toString();
+			return new StringBuilder(getClass().getSimpleName()).append("{id=").append(id).
+					append("; event=\"").append(event).append("\"; data=\"").append(data).
+					append("\"}").toString();
 		}
 	}
 	
