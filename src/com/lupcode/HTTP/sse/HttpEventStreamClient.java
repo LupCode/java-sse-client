@@ -35,12 +35,23 @@ public class HttpEventStreamClient {
 	 * @since 2020-12-22
 	 */
 	public class Event {
+		private final long id;
 		private final String event;
 		private final String data;
 		
-		protected Event(String event, String data) {
+		protected Event(long id, String event, String data) {
+			this.id = id;
 			this.event = event;
 			this.data = data;
+		}
+		
+		/**
+		 * Returns the ID of the event that has been received 
+		 * (same as {@link HttpEventStreamClient#getLastEventID()}
+		 * @return ID of received event
+		 */
+		public long getID() {
+			return id;
 		}
 		
 		/**
@@ -611,18 +622,18 @@ public class HttpEventStreamClient {
 						}
 						
 						if(hasDataOrEvent) {
-							Event event = new Event(this.event, this.data.toString());
 							if(!updatedEventID) lastEventID++;
+							Event event = new Event(lastEventID, this.event, this.data.toString());
 							for(InternalEventStreamAdapter listener : internalListeners)
 								try {
-									listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
+									listener.onEvent(HttpEventStreamClient.this, event);
 								} catch (Exception ex) {
 									for(InternalEventStreamAdapter l : internalListeners)
 										try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}
 								}
 							for(EventStreamListener listener : listeners)
 								try {
-									listener.onEvent(HttpEventStreamClient.this, lastEventID, event);
+									listener.onEvent(HttpEventStreamClient.this, event);
 								} catch (Exception ex) {
 									for(EventStreamListener l : listeners)
 										try { l.onError(HttpEventStreamClient.this, ex); } catch (Exception ex1) {}

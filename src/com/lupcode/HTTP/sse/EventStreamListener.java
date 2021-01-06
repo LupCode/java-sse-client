@@ -12,10 +12,9 @@ public interface EventStreamListener {
 	/**
 	 * Gets called if a new event has been received
 	 * @param client Event stream client that received the event
-	 * @param eventID ID of the event that has been received (same as {@link HttpEventStreamClient#getLastEventID()}
 	 * @param event Event that has been received
 	 */
-	public void onEvent(HttpEventStreamClient client, long eventID, HttpEventStreamClient.Event event);
+	public void onEvent(HttpEventStreamClient client, HttpEventStreamClient.Event event);
 	
 	/**
 	 * Gets called if an error has occurred
