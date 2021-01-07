@@ -202,6 +202,27 @@ public class HttpEventStreamClient {
 	}
 	
 	/**
+	 * Sets the URL that will be used after the next reconnect. 
+	 * If change should immediately take place call {@link HttpEventStreamClient#start()}
+	 * afterwards
+	 * @param url URL the client should listen at
+	 */
+	public void setURL(String url) {
+		this.uri = URI.create(url);
+	}
+	
+	/**
+	 * Sets the URI that will be used after the next reconnect. 
+	 * If change should immediately take place call {@link HttpEventStreamClient#start()}
+	 * afterwards
+	 * @param uri URI the client should listen at
+	 */
+	public void setURI(URI uri) {
+		if(uri == null) throw new NullPointerException("URI cannot be null");
+		this.uri = uri;
+	}
+	
+	/**
 	 * Returns the HTTP method type that client uses for HTTP requests
 	 * @return HTTP request method type
 	 */
@@ -255,7 +276,7 @@ public class HttpEventStreamClient {
 	 * Returns HTTP headers that will be used for HTTP requests
 	 * @return HTTP headers map
 	 */
-	public Map<String, String> getHeaders(){
+	public synchronized Map<String, String> getHeaders(){
 		return new TreeMap<>(headers);
 	}
 	
@@ -264,7 +285,7 @@ public class HttpEventStreamClient {
 	 * SSE specific headers cannot be overwritten (Accept, Cache-Control, Last-Event-ID)
 	 * @param headers HTTP headers that should be added
 	 */
-	public void addHeaders(Map<String, String> headers) {
+	public synchronized void addHeaders(Map<String, String> headers) {
 		if(headers==null) return;
 		for(Entry<String, String> entry : headers.entrySet())
 			this.headers.put(entry.getKey().trim().toLowerCase(), entry.getValue());
@@ -275,7 +296,7 @@ public class HttpEventStreamClient {
 	 * SSE specific headers cannot be overwritten (Accept, Cache-Control, Last-Event-ID)
 	 * @param headers HTTP headers that should be added
 	 */
-	public void setHeaders(Map<String, String> headers) {
+	public synchronized void setHeaders(Map<String, String> headers) {
 		if(headers==null) return;
 		this.headers.clear();
 		addHeaders(headers);
@@ -287,7 +308,7 @@ public class HttpEventStreamClient {
 	 * @param key Key of the header (cannot be null or blank)
 	 * @param value Value that should be set (if null then key gets removed)
 	 */
-	public void setHeader(String key, String value) {
+	public synchronized void setHeader(String key, String value) {
 		if(key==null || key.isBlank()) throw new NullPointerException("Key cannot be null or blank");
 		if(value!=null && !value.isBlank())
 			this.headers.put(key.trim().toLowerCase(), value);
@@ -299,7 +320,7 @@ public class HttpEventStreamClient {
 	 * @param key Key the value should be returned for (cannot be null or empty)
 	 * @return Value that is set for the HTTP header or null if not set
 	 */
-	public String getHeader(String key) {
+	public synchronized String getHeader(String key) {
 		return key!=null ? this.headers.get(key.trim().toLowerCase()) : null;
 	}
 	
@@ -308,7 +329,7 @@ public class HttpEventStreamClient {
 	 * @param key Key of header that should be removed 
 	 * @return Previously set value or null if not previously set
 	 */
-	public String removeHeader(String key) {
+	public synchronized String removeHeader(String key) {
 		if(key==null) return null;
 		return this.headers.remove(key.trim().toLowerCase());
 	}
@@ -317,7 +338,7 @@ public class HttpEventStreamClient {
 	 * Removes multiple HTTP headers so they no longer will be used for HTTP requests
 	 * @param keys Keys of the HTTP headers
 	 */
-	public void removeHeaders(String... keys) {
+	public synchronized void removeHeaders(String... keys) {
 		if(keys==null) return;
 		for(String key: keys)
 			this.headers.remove(key.trim().toLowerCase());
@@ -326,7 +347,7 @@ public class HttpEventStreamClient {
 	/**
 	 * Removes all HTTP headers so no custom HTTP headers will be sent in the HTTP requests
 	 */
-	public void clearHeaders() {
+	public synchronized void clearHeaders() {
 		this.headers.clear();
 	}
 	
@@ -476,7 +497,7 @@ public class HttpEventStreamClient {
 	/**
 	 * Removes all listeners so they no longer get called
 	 */
-	public void removeAllListeners() {
+	public synchronized void removeAllListeners() {
 		listeners.clear();
 	}
 	
@@ -485,7 +506,7 @@ public class HttpEventStreamClient {
 	 * Multiple adding of same listener will only add once
 	 * @param listener Listener(s) that should be added
 	 */
-	public void addListener(EventStreamListener... listener) {
+	public synchronized void addListener(EventStreamListener... listener) {
 		for(EventStreamListener l : listener)
 			if(l!=null) this.listeners.add(l);
 	}
@@ -494,7 +515,7 @@ public class HttpEventStreamClient {
 	 * Removes the listeners so they no longer get called
 	 * @param listener Listeners that should be removed
 	 */
-	public void removeListener(EventStreamListener... listener) {
+	public synchronized void removeListener(EventStreamListener... listener) {
 		for(EventStreamListener l : listener)
 			if(l!=null) this.listeners.remove(l);
 	}
@@ -514,7 +535,7 @@ public class HttpEventStreamClient {
 	 * but calls {@link EventStreamListener#onReconnect()} on listeners
 	 * @return This client instance
 	 */
-	public HttpEventStreamClient start() {
+	public synchronized HttpEventStreamClient start() {
 		for(InternalEventStreamAdapter listener : internalListeners)
 			try {
 				listener.onStartFirst((running!=null && running.isDone()) ? running.get() : null);
@@ -688,14 +709,20 @@ public class HttpEventStreamClient {
 	 * Executes {@link EventStreamListener#onClose()} on listeners
 	 * @return This client instance
 	 */
-	public HttpEventStreamClient stop() {
+	public synchronized HttpEventStreamClient stop() {
 		CompletableFuture<HttpResponse<Void>> run = running;
 		running = null;
-		if(run!=null) run.cancel(true);
+		HttpResponse<Void> response = null;
+		if(run!=null) {
+			if(run.isDone())
+				if(!run.isCancelled() && !run.isCompletedExceptionally())
+					response = run.getNow(null);
+			else run.cancel(true);
+		}
 		for(InternalEventStreamAdapter listener : internalListeners)
-			try { listener.onClose(this, run.get()); } catch (Exception e) {}
+			try { listener.onClose(this, response); } catch (Exception e) {}
 		for(EventStreamListener listener : listeners)
-			try { listener.onClose(this, run.get()); } catch (Exception e) {}
+			try { listener.onClose(this, response); } catch (Exception e) {}
 		return this;
 	}
 }

@@ -35,7 +35,7 @@ public interface EventStreamListener {
 	/**
 	 * Gets called if client has been closed
 	 * @param client Event stream client that has closed
-	 * @param response Last response received from server
+	 * @param response Last response received from server (may be null)
 	 */
 	public void onClose(HttpEventStreamClient client, HttpResponse<Void> response);
 }
